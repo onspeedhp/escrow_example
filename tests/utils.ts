@@ -46,3 +46,7 @@ export function u16ToBytes(value: number): Uint8Array {
   view.setUint16(0, value, true); // true để lưu theo Little Endian, false để lưu theo Big Endian
   return new Uint8Array(buffer);
 }
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

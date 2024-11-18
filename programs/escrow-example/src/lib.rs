@@ -9,8 +9,8 @@ pub use state::*;
 
 declare_id!("EEVctJWhQ3Ag9u5H8XLYTai5sWsHWsTNJ2YrcJAP8D2g");
 
-// 1 day
-pub const DEADLINE: i64 = 60 * 60 * 24;
+// 1 minute
+pub const DEADLINE: i64 = 60;
 
 #[program]
 pub mod escrow_example {
@@ -20,10 +20,7 @@ pub mod escrow_example {
         instructions::init_escrow(ctx, escrow_args)
     }
 
-    pub fn withdraw_funds(
-        ctx: Context<WithdrawFunds>,
-        receiver_index: u8,
-    ) -> Result<()> {
+    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, receiver_index: u8) -> Result<()> {
         instructions::withdraw_funds(ctx, receiver_index)
     }
 

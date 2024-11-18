@@ -6,11 +6,14 @@ import {
   PublicKey,
   Transaction,
 } from '@solana/web3.js';
-import { createAccount, u16ToBytes } from './utils';
+import { createAccount, sleep, u16ToBytes } from './utils';
 import {
   createMint,
+  getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
   mintTo,
+  TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import * as bs58 from 'bs58';
 import * as dotenv from 'dotenv';
@@ -214,7 +217,7 @@ describe('escrow-example', () => {
     console.log('Withdraw funds: ', withdrawTx);
   });
 
-  xit('Claim', async () => {
+  it('Claim', async () => {
     // prepare new account
     const newAccount = Keypair.generate();
 
@@ -284,12 +287,8 @@ describe('escrow-example', () => {
 
     console.log('Init escrow: ', signature);
 
-    const receiverTokenAccount = await getOrCreateAssociatedTokenAccount(
-      anchorProvider.connection,
-      keypair,
-      mint,
-      listReceiver[0]
-    );
+    // await 1 minute
+    await sleep(60 * 1000);
 
     const [escrowAccount] = PublicKey.findProgramAddressSync(
       [
@@ -300,28 +299,35 @@ describe('escrow-example', () => {
       program.programId
     );
 
-    const BPF_LOADER_PROGRAM = new PublicKey(
-      'BPFLoaderUpgradeab1e11111111111111111111111'
+    const [vaultTokenAccount] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('token-seed'),
+        newAccount.publicKey.toBuffer(),
+        mint.toBuffer(),
+      ],
+      program.programId
     );
 
-    const [programData] = PublicKey.findProgramAddressSync(
-      [program.programId.toBuffer()],
-      BPF_LOADER_PROGRAM
-    );
-
-    const withdrawTx = await program.methods
-      .withdrawFunds(0)
+    const claimIns = await program.methods
+      .claim()
       .accountsPartial({
-        signer: keypair.publicKey,
+        signer: newAccount.publicKey,
+        mint,
         escrowAccount: escrowAccount,
-        receiverTokenAccount: receiverTokenAccount.address,
-        programData: programData,
-        mint: mint,
+        initializerDepositTokenAccount: destination.address,
+        vaultTokenAccount,
       })
-      .rpc({
-        skipPreflight: true,
-      });
+      .instruction();
 
-    console.log('Withdraw funds: ', withdrawTx);
+    const claimTxn = new Transaction().add(claimIns);
+    claimTxn.feePayer = newAccount.publicKey;
+
+    const claimSig = await anchorProvider.connection.sendTransaction(
+      claimTxn,
+      [newAccount],
+      { skipPreflight: true }
+    );
+
+    console.log('Claim txn: ', claimSig);
   });
 });
