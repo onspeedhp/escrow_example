@@ -1,11 +1,16 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{ Mint, Token, TokenAccount};
+use spl_token::{instruction::transfer_checked, solana_program::program::invoke_signed};
 
 use crate::{Escrow, EscrowError, DEADLINE, ID};
 
 pub fn claim(ctx: Context<Claim>) -> Result<()> {
     let escrow_account = &ctx.accounts.escrow_account;
-
+    let vault_authority = &ctx.accounts.vault_authority.to_account_info();
+    let token_program = &ctx.accounts.token_program.to_account_info();
+    let vault_token_account = &ctx.accounts.vault_token_account.to_account_info();
+    let mint = &ctx.accounts.mint;
+    let initializer_deposit_token_account = &ctx.accounts.initializer_deposit_token_account.to_account_info();
 
     let clock = Clock::get()?;
     let current_timestamp = clock.unix_timestamp;
@@ -15,18 +20,7 @@ pub fn claim(ctx: Context<Claim>) -> Result<()> {
         return Err(EscrowError::InvalidTimeToWithdraw.into());
     }
 
-    // transfer funds for in
-    let transfer_accounts = Transfer {
-        from: ctx.accounts.vault_authority.to_account_info().clone(),
-        to: ctx
-            .accounts
-            .initializer_deposit_token_account
-            .to_account_info()
-            .clone(),
-        authority: ctx.accounts.vault_authority.to_account_info().clone(),
-    };
-
-    let seeds: &[&[u8]] = &[b"vault_authority"];
+   let seeds: &[&[u8]] = &[b"vault_authority"];
 
     let (_, bump) = Pubkey::find_program_address(&seeds, &ID);
 
@@ -34,15 +28,29 @@ pub fn claim(ctx: Context<Claim>) -> Result<()> {
     let binding = [bump];
     seeds_signer.push(&binding);
 
-    let bind: &[&[&[u8]]] = &[seeds_signer];
+    invoke_signed(
+        &transfer_checked(
+            token_program.key,
+            &vault_token_account.key(),
+            &mint.key(),
+            initializer_deposit_token_account.key,
+            vault_authority.key,
+            &[],
+            escrow_account.amount,
+            mint.decimals,
+        )
+        .unwrap(),
+        &[
+            token_program.clone(),
+            vault_token_account.clone(),
+            mint.to_account_info().clone(),
+            initializer_deposit_token_account.clone(),
+            vault_authority.clone(),
+        ],
+        &[seeds_signer],
+    )?;
 
-    let transfer_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.to_account_info().clone(),
-        transfer_accounts,
-        bind,
-    );
-
-    transfer(transfer_ctx, escrow_account.amount)
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -53,6 +61,11 @@ pub struct Claim<'info> {
         constraint = escrow_account.initializer == signer.key()
     )]
     pub signer: Signer<'info>,
+
+    #[account(
+        constraint = escrow_account.mint == mint.key()
+    )]
+    pub mint: Account<'info, Mint>,
 
     #[account(
         mut,
