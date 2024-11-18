@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 
-use crate::{Escrow, EscrowCount};
+use crate::Escrow;
 
 pub fn init_escrow(ctx: Context<InitEscrow>, escrow_args: Escrow) -> Result<()> {
     let initializer = &ctx.accounts.initializer;
@@ -67,19 +67,10 @@ pub struct InitEscrow<'info> {
     pub vault_token_account: Account<'info, TokenAccount>,
 
     #[account(
-        init_if_needed,
-        payer = initializer,
-        space = 8 + EscrowCount::INIT_SPACE,
-        seeds = [EscrowCount::PREFIX_SEED],
-        bump,
-    )]
-    pub escrow_counter: Account<'info, EscrowCount>,
-
-    #[account(
         init,
         payer = initializer,
         space = 8 + Escrow::INIT_SPACE,
-        seeds = [Escrow::PREFIX_SEED, &escrow_counter.counter.to_le_bytes()],
+        seeds = [Escrow::PREFIX_SEED, initializer.key.as_ref(), mint.key.as_ref()],
         bump
     )]
     // The escrow account, it will hold all necessary info about the trade.

@@ -3,11 +3,7 @@ use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 
 use crate::{program::EscrowExample, Escrow, EscrowError, DEADLINE, ID};
 
-pub fn withdraw_funds(
-    ctx: Context<WithdrawFunds>,
-    _escrow_index: u16,
-    _receiver_index: u8,
-) -> Result<()> {
+pub fn withdraw_funds(ctx: Context<WithdrawFunds>, _receiver_index: u8) -> Result<()> {
     let escrow_account = &ctx.accounts.escrow_account;
 
     let clock = Clock::get()?;
@@ -49,7 +45,7 @@ pub fn withdraw_funds(
 }
 
 #[derive(Accounts)]
-#[instruction(_escrow_index: u16, _receiver_index: u8)]
+#[instruction(_receiver_index: u8)]
 pub struct WithdrawFunds<'info> {
     #[account(mut)]
     // signer must be contract owner
@@ -57,7 +53,7 @@ pub struct WithdrawFunds<'info> {
 
     #[account(
         mut,
-        seeds = [Escrow::PREFIX_SEED, &_escrow_index.to_le_bytes()],
+        seeds = [Escrow::PREFIX_SEED, escrow_account.initializer.as_ref(), escrow_account.mint.as_ref()],
         bump,
         owner = ID,
         close = signer

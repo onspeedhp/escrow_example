@@ -22,13 +22,12 @@ pub mod escrow_example {
 
     pub fn withdraw_funds(
         ctx: Context<WithdrawFunds>,
-        escrow_index: u16,
         receiver_index: u8,
     ) -> Result<()> {
-        instructions::withdraw_funds(ctx, escrow_index, receiver_index)
+        instructions::withdraw_funds(ctx, receiver_index)
     }
 
-    pub fn claim(ctx: Context<Claim>, escrow_index: u16) -> Result<()> {
-        instructions::claim(ctx, escrow_index)
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+        instructions::claim(ctx)
     }
 }

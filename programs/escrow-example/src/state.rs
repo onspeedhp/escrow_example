@@ -14,13 +14,3 @@ pub struct Escrow {
 impl Escrow {
     pub const PREFIX_SEED: &'static [u8] = b"escrow_account";
 }
-
-#[account]
-#[derive(Debug, InitSpace)]
-pub struct EscrowCount {
-    pub counter: u16,
-}
-
-impl EscrowCount {
-    pub const PREFIX_SEED: &'static [u8] = b"escrow_counter";
-}

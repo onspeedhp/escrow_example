@@ -3,7 +3,7 @@ use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 
 use crate::{Escrow, EscrowError, DEADLINE, ID};
 
-pub fn claim(ctx: Context<Claim>, _escrow_index: u16) -> Result<()> {
+pub fn claim(ctx: Context<Claim>) -> Result<()> {
     let escrow_account = &ctx.accounts.escrow_account;
 
 
@@ -46,7 +46,6 @@ pub fn claim(ctx: Context<Claim>, _escrow_index: u16) -> Result<()> {
 }
 
 #[derive(Accounts)]
-#[instruction(_escrow_index: u16)]
 pub struct Claim<'info> {
     #[account(
         mut,
@@ -57,7 +56,7 @@ pub struct Claim<'info> {
 
     #[account(
         mut,
-        seeds = [Escrow::PREFIX_SEED, &_escrow_index.to_le_bytes()],
+        seeds = [Escrow::PREFIX_SEED, escrow_account.initializer.as_ref(), escrow_account.mint.as_ref()],
         bump,
         owner = ID,
         close = signer
