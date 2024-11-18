@@ -67,7 +67,7 @@ pub struct InitEscrow<'info> {
     pub vault_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = initializer,
         space = 8 + Escrow::INIT_SPACE,
         seeds = [Escrow::PREFIX_SEED, initializer.key.as_ref(), mint.key.as_ref()],

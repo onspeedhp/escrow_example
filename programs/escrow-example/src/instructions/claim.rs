@@ -94,7 +94,8 @@ pub struct Claim<'info> {
     #[account(
         mut,
         constraint = vault_token_account.owner == vault_authority.key(),
-        constraint = vault_token_account.mint == escrow_account.mint
+        constraint = vault_token_account.mint == escrow_account.mint,
+        close = signer
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
 

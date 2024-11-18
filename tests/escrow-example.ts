@@ -106,7 +106,7 @@ describe('escrow-example', () => {
     console.log('Init escrow: ', signature);
   });
 
-  xit('Withdraw to random receiver', async () => {
+  it('Withdraw to random receiver', async () => {
     // prepare new account
     const newAccount = Keypair.generate();
 
@@ -217,7 +217,7 @@ describe('escrow-example', () => {
     console.log('Withdraw funds: ', withdrawTx);
   });
 
-  it('Claim', async () => {
+  xit('Claim', async () => {
     // prepare new account
     const newAccount = Keypair.generate();
 
