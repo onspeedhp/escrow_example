@@ -54,7 +54,7 @@ pub struct InitEscrow<'info> {
         bump,
     )]
     /// CHECK:
-    pub vault_authority: UncheckedAccount<'info>,
+    pub vault_authority: AccountInfo<'info>,
 
     #[account(
         init_if_needed,
@@ -64,7 +64,7 @@ pub struct InitEscrow<'info> {
         token::mint = mint,
         token::authority = vault_authority,
     )]
-    pub vault_token_account: Account<'info, TokenAccount>,
+    pub vault_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init,
@@ -74,7 +74,7 @@ pub struct InitEscrow<'info> {
         bump
     )]
     // The escrow account, it will hold all necessary info about the trade.
-    pub escrow_account: Account<'info, Escrow>,
+    pub escrow_account: Box<Account<'info, Escrow>>,
 
     pub system_program: Program<'info, System>,
 

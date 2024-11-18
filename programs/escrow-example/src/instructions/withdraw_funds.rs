@@ -1,10 +1,16 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{Mint, Token, TokenAccount};
+use spl_token::{instruction::transfer_checked, solana_program::program::invoke_signed};
 
 use crate::{program::EscrowExample, Escrow, EscrowError, DEADLINE, ID};
 
 pub fn withdraw_funds(ctx: Context<WithdrawFunds>, _receiver_index: u8) -> Result<()> {
     let escrow_account = &ctx.accounts.escrow_account;
+    let token_program = &ctx.accounts.token_program.to_account_info();
+    let vault_token_account = &ctx.accounts.vault_token_account.to_account_info();
+    let mint = &ctx.accounts.mint;
+    let receiver_token_account = &ctx.accounts.receiver_token_account.to_account_info();
+    let vault_authority = &ctx.accounts.vault_authority.to_account_info();
 
     let clock = Clock::get()?;
     let current_timestamp = clock.unix_timestamp;
@@ -14,17 +20,6 @@ pub fn withdraw_funds(ctx: Context<WithdrawFunds>, _receiver_index: u8) -> Resul
         return Err(EscrowError::InvalidTimeToWithdraw.into());
     }
 
-    // transfer funds for receiver
-    let transfer_accounts = Transfer {
-        from: ctx.accounts.vault_authority.to_account_info().clone(),
-        to: ctx
-            .accounts
-            .receiver_token_account
-            .to_account_info()
-            .clone(),
-        authority: ctx.accounts.vault_authority.to_account_info().clone(),
-    };
-
     let seeds: &[&[u8]] = &[b"vault_authority"];
 
     let (_, bump) = Pubkey::find_program_address(&seeds, &ID);
@@ -33,15 +28,29 @@ pub fn withdraw_funds(ctx: Context<WithdrawFunds>, _receiver_index: u8) -> Resul
     let binding = [bump];
     seeds_signer.push(&binding);
 
-    let bind: &[&[&[u8]]] = &[seeds_signer];
+    invoke_signed(
+        &transfer_checked(
+            token_program.key,
+            &vault_token_account.key(),
+            &mint.key(),
+            receiver_token_account.key,
+            vault_authority.key,
+            &[],
+            escrow_account.amount,
+            mint.decimals,
+        )
+        .unwrap(),
+        &[
+            token_program.clone(),
+            vault_token_account.clone(),
+            mint.to_account_info().clone(),
+            receiver_token_account.clone(),
+            vault_authority.clone(),
+        ],
+        &[seeds_signer],
+    )?;
 
-    let transfer_ctx = CpiContext::new_with_signer(
-        ctx.accounts.token_program.to_account_info().clone(),
-        transfer_accounts,
-        bind,
-    );
-
-    transfer(transfer_ctx, escrow_account.amount)
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -52,11 +61,14 @@ pub struct WithdrawFunds<'info> {
     pub signer: Signer<'info>,
 
     #[account(
-        mut,
+        constraint = escrow_account.mint == mint.key()
+    )]
+    pub mint: Account<'info, Mint>,
+
+    #[account(
         seeds = [Escrow::PREFIX_SEED, escrow_account.initializer.as_ref(), escrow_account.mint.as_ref()],
         bump,
         owner = ID,
-        close = signer
     )]
     // The escrow account, it will hold all necessary info about the trade.
     pub escrow_account: Account<'info, Escrow>,
@@ -74,7 +86,6 @@ pub struct WithdrawFunds<'info> {
         bump,
         constraint = vault_token_account.owner == vault_authority.key(),
         constraint = vault_token_account.mint == escrow_account.mint,
-        close = signer
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
 
