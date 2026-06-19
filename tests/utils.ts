@@ -1,5 +1,5 @@
-import { AnchorProvider } from '@coral-xyz/anchor';
-import { Keypair, SystemProgram, Transaction } from '@solana/web3.js';
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 
 export const createAccount = async ({
   provider,
@@ -41,9 +41,9 @@ export const createAccount = async ({
 };
 
 export function u16ToBytes(value: number): Uint8Array {
-  const buffer = new ArrayBuffer(2); // u16 cần 2 bytes
+  const buffer = new ArrayBuffer(2); // u16 needs 2 bytes
   const view = new DataView(buffer);
-  view.setUint16(0, value, true); // true để lưu theo Little Endian, false để lưu theo Big Endian
+  view.setUint16(0, value, true); // true stores Little Endian, false stores Big Endian
   return new Uint8Array(buffer);
 }
 

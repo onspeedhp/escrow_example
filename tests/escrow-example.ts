@@ -1,333 +1,136 @@
-import * as anchor from '@coral-xyz/anchor';
-import { EscrowExample } from '../target/types/escrow_example';
-import {
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  Transaction,
-} from '@solana/web3.js';
-import { createAccount, sleep, u16ToBytes } from './utils';
+import * as anchor from "@coral-xyz/anchor";
+import { EscrowExample } from "../target/types/escrow_example";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   createMint,
-  getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync,
+  getAccount,
   getOrCreateAssociatedTokenAccount,
   mintTo,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
-import * as bs58 from 'bs58';
-import * as dotenv from 'dotenv';
-import { BN } from 'bn.js';
-import { expect } from 'chai';
+} from "@solana/spl-token";
+import { BN } from "bn.js";
+import { expect } from "chai";
 
-dotenv.config();
-
-describe('escrow-example', () => {
-  // Configure the client to use the local cluster.
+describe("escrow-example", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace
     .EscrowExample as anchor.Program<EscrowExample>;
-  const anchorProvider = program.provider as anchor.AnchorProvider;
-  const keypair = Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY));
+  const provider = program.provider as anchor.AnchorProvider;
+  const payer = (provider.wallet as any).payer as Keypair;
 
-  xit('Init escrow', async () => {
-    // prepare new account
-    const newAccount = Keypair.generate();
+  it("locks buyer funds and releases them to seller", async () => {
+    const buyer = Keypair.generate();
+    const seller = Keypair.generate();
 
-    // create a new account
-    await createAccount({
-      provider: anchorProvider,
-      newAccountKeypair: newAccount,
-      lamports: LAMPORTS_PER_SOL,
-    });
+    await fund(buyer.publicKey);
+    await fund(seller.publicKey);
 
-    // create a new token
     const mint = await createMint(
-      anchorProvider.connection,
-      keypair,
-      anchorProvider.wallet.publicKey,
+      provider.connection,
+      payer,
+      payer.publicKey,
       null,
-      9
+      6
     );
 
-    // create destination token account
-    const destination = await getOrCreateAssociatedTokenAccount(
-      anchorProvider.connection,
-      keypair,
+    const buyerTokenAccount = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      payer,
       mint,
-      newAccount.publicKey
+      buyer.publicKey
     );
-
-    // mint for new user
-    const sig = await mintTo(
-      anchorProvider.connection,
-      keypair,
+    const sellerTokenAccount = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      payer,
       mint,
-      destination.address,
-      keypair,
-      1000 * 10 ** 9
+      seller.publicKey
     );
 
-    console.log('Mint for user: ', sig);
+    const amount = new BN(1_000_000);
+    const quantity = new BN(100);
+    const escrowId = new BN(Date.now());
+    const deliveryDeadline = new BN(Math.floor(Date.now() / 1000) + 60);
 
-    // init escrow
-    const listReceiver: PublicKey[] = [];
-    for (let i = 0; i < 10; i++) {
-      listReceiver.push(Keypair.generate().publicKey);
-    }
-
-    const initEscrowIns = await program.methods
-      .initEscrow({
-        initializer: newAccount.publicKey,
-        receiver: listReceiver,
-        mint: mint,
-        startTime: new BN(Math.floor(Date.now() / 1000)),
-        amount: new BN(1000 * 10 ** 9),
-      })
-      .accounts({
-        initializer: newAccount.publicKey,
-        initializerDepositTokenAccount: destination.address,
-        mint: mint,
-      })
-      .instruction();
-
-    const tx = new Transaction().add(initEscrowIns);
-    tx.feePayer = newAccount.publicKey;
-
-    const signature = await anchorProvider.connection.sendTransaction(
-      tx,
-      [newAccount],
-      {
-        skipPreflight: true,
-      }
-    );
-
-    console.log('Init escrow: ', signature);
-  });
-
-  it('Withdraw to random receiver', async () => {
-    // prepare new account
-    const newAccount = Keypair.generate();
-
-    // create a new account
-    await createAccount({
-      provider: anchorProvider,
-      newAccountKeypair: newAccount,
-      lamports: LAMPORTS_PER_SOL,
-    });
-
-    // create a new token
-    const mint = await createMint(
-      anchorProvider.connection,
-      keypair,
-      anchorProvider.wallet.publicKey,
-      null,
-      9
-    );
-
-    // create destination token account
-    const destination = await getOrCreateAssociatedTokenAccount(
-      anchorProvider.connection,
-      keypair,
+    await mintTo(
+      provider.connection,
+      payer,
       mint,
-      newAccount.publicKey
-    );
-
-    // mint for new user
-    const sig = await mintTo(
-      anchorProvider.connection,
-      keypair,
-      mint,
-      destination.address,
-      keypair,
-      1000 * 10 ** 9
-    );
-
-    console.log('Mint for user: ', sig);
-
-    // init escrow
-    const listReceiver: PublicKey[] = [];
-    for (let i = 0; i < 10; i++) {
-      listReceiver.push(Keypair.generate().publicKey);
-    }
-
-    const initEscrowIns = await program.methods
-      .initEscrow({
-        initializer: newAccount.publicKey,
-        receiver: listReceiver,
-        mint: mint,
-        startTime: new BN(Math.floor(Date.now() / 1000)),
-        amount: new BN(1000 * 10 ** 9),
-      })
-      .accounts({
-        initializer: newAccount.publicKey,
-        initializerDepositTokenAccount: destination.address,
-        mint: mint,
-      })
-      .instruction();
-
-    const tx = new Transaction().add(initEscrowIns);
-    tx.feePayer = newAccount.publicKey;
-
-    const signature = await anchorProvider.connection.sendTransaction(tx, [
-      newAccount,
-    ]);
-
-    console.log('Init escrow: ', signature);
-
-    const receiverTokenAccount = await getOrCreateAssociatedTokenAccount(
-      anchorProvider.connection,
-      keypair,
-      mint,
-      listReceiver[0]
+      buyerTokenAccount.address,
+      payer,
+      Number(amount)
     );
 
     const [escrowAccount] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from('escrow_account'),
-        newAccount.publicKey.toBuffer(),
-        mint.toBuffer(),
+        Buffer.from("escrow"),
+        buyer.publicKey.toBuffer(),
+        seller.publicKey.toBuffer(),
+        escrowId.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
     );
-
-    const BPF_LOADER_PROGRAM = new PublicKey(
-      'BPFLoaderUpgradeab1e11111111111111111111111'
-    );
-
-    const [programData] = PublicKey.findProgramAddressSync(
-      [program.programId.toBuffer()],
-      BPF_LOADER_PROGRAM
-    );
-
-    const withdrawTx = await program.methods
-      .withdrawFunds(0)
-      .accountsPartial({
-        signer: keypair.publicKey,
-        escrowAccount: escrowAccount,
-        receiverTokenAccount: receiverTokenAccount.address,
-        programData: programData,
-        mint: mint,
-      })
-      .rpc({
-        skipPreflight: true,
-      });
-
-    console.log('Withdraw funds: ', withdrawTx);
-  });
-
-  xit('Claim', async () => {
-    // prepare new account
-    const newAccount = Keypair.generate();
-
-    // create a new account
-    await createAccount({
-      provider: anchorProvider,
-      newAccountKeypair: newAccount,
-      lamports: LAMPORTS_PER_SOL,
-    });
-
-    // create a new token
-    const mint = await createMint(
-      anchorProvider.connection,
-      keypair,
-      anchorProvider.wallet.publicKey,
-      null,
-      9
-    );
-
-    // create destination token account
-    const destination = await getOrCreateAssociatedTokenAccount(
-      anchorProvider.connection,
-      keypair,
-      mint,
-      newAccount.publicKey
-    );
-
-    // mint for new user
-    const sig = await mintTo(
-      anchorProvider.connection,
-      keypair,
-      mint,
-      destination.address,
-      keypair,
-      1000 * 10 ** 9
-    );
-
-    console.log('Mint for user: ', sig);
-
-    // init escrow
-    const listReceiver: PublicKey[] = [];
-    for (let i = 0; i < 10; i++) {
-      listReceiver.push(Keypair.generate().publicKey);
-    }
-
-    const initEscrowIns = await program.methods
-      .initEscrow({
-        initializer: newAccount.publicKey,
-        receiver: listReceiver,
-        mint: mint,
-        startTime: new BN(Math.floor(Date.now() / 1000)),
-        amount: new BN(1000 * 10 ** 9),
-      })
-      .accounts({
-        initializer: newAccount.publicKey,
-        initializerDepositTokenAccount: destination.address,
-        mint: mint,
-      })
-      .instruction();
-
-    const tx = new Transaction().add(initEscrowIns);
-    tx.feePayer = newAccount.publicKey;
-
-    const signature = await anchorProvider.connection.sendTransaction(tx, [
-      newAccount,
-    ]);
-
-    console.log('Init escrow: ', signature);
-
-    // await 1 minute
-    await sleep(60 * 1000);
-
-    const [escrowAccount] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('escrow_account'),
-        newAccount.publicKey.toBuffer(),
-        mint.toBuffer(),
-      ],
+    const [vaultAuthority] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault_authority"), escrowAccount.toBuffer()],
       program.programId
     );
-
     const [vaultTokenAccount] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('token-seed'),
-        newAccount.publicKey.toBuffer(),
-        mint.toBuffer(),
-      ],
+      [Buffer.from("vault"), escrowAccount.toBuffer()],
       program.programId
     );
 
-    const claimIns = await program.methods
-      .claim()
+    await program.methods
+      .initEscrow({
+        escrowId,
+        amount,
+        quantity,
+        deliveryDeadline,
+      })
       .accountsPartial({
-        signer: newAccount.publicKey,
+        buyer: buyer.publicKey,
+        buyerTokenAccount: buyerTokenAccount.address,
+        seller: seller.publicKey,
         mint,
-        escrowAccount: escrowAccount,
-        initializerDepositTokenAccount: destination.address,
+        escrowAccount,
+        vaultAuthority,
         vaultTokenAccount,
       })
-      .instruction();
+      .signers([buyer])
+      .rpc();
 
-    const claimTxn = new Transaction().add(claimIns);
-    claimTxn.feePayer = newAccount.publicKey;
-
-    const claimSig = await anchorProvider.connection.sendTransaction(
-      claimTxn,
-      [newAccount],
-      { skipPreflight: true }
+    const vaultAfterInit = await getAccount(
+      provider.connection,
+      vaultTokenAccount
     );
+    expect(vaultAfterInit.amount).to.equal(BigInt(amount.toString()));
 
-    console.log('Claim txn: ', claimSig);
+    await program.methods
+      .confirmReceipt()
+      .accountsPartial({
+        buyer: buyer.publicKey,
+        escrowAccount,
+        mint,
+        vaultAuthority,
+        vaultTokenAccount,
+        sellerTokenAccount: sellerTokenAccount.address,
+      })
+      .signers([buyer])
+      .rpc();
+
+    const sellerAfterRelease = await getAccount(
+      provider.connection,
+      sellerTokenAccount.address
+    );
+    expect(sellerAfterRelease.amount).to.equal(BigInt(amount.toString()));
+
+    const escrowState = await program.account.escrow.fetch(escrowAccount);
+    expect(escrowState.releasedAmount.toString()).to.equal(amount.toString());
   });
+
+  async function fund(publicKey: PublicKey) {
+    const signature = await provider.connection.requestAirdrop(
+      publicKey,
+      LAMPORTS_PER_SOL
+    );
+    await provider.connection.confirmTransaction(signature, "confirmed");
+  }
 });

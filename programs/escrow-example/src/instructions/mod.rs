@@ -1,7 +1,9 @@
-pub mod claim;
+pub mod claim_timeout;
+pub mod confirm_receipt;
 pub mod init_escrow;
-pub mod withdraw_funds;
+pub mod resolve_partial;
 
-pub use claim::*;
+pub use claim_timeout::*;
+pub use confirm_receipt::*;
 pub use init_escrow::*;
-pub use withdraw_funds::*;
+pub use resolve_partial::*;

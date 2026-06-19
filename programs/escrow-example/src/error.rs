@@ -2,12 +2,30 @@ use anchor_lang::error_code;
 
 #[error_code]
 pub enum EscrowError {
-    #[msg("Time is invalid to withdraw funds")]
-    InvalidTimeToWithdraw,
+    #[msg("Amount must be greater than zero")]
+    InvalidAmount,
 
-    #[msg("Admin is already withdraw this escrow")]
-    AlreadyWithdraw,
+    #[msg("Quantity must be greater than zero")]
+    InvalidQuantity,
 
-    #[msg("Invalid time to claim funds")]
-    InvalidTimeToClaim,
+    #[msg("Delivery deadline must be in the future")]
+    InvalidDeadline,
+
+    #[msg("Escrow is not in the expected status")]
+    InvalidStatus,
+
+    #[msg("Received quantity cannot exceed agreed quantity")]
+    ReceivedQuantityTooHigh,
+
+    #[msg("Only the buyer can call this instruction")]
+    UnauthorizedBuyer,
+
+    #[msg("Only the seller can call this instruction")]
+    UnauthorizedSeller,
+
+    #[msg("Timeout has not passed yet")]
+    TimeoutNotReached,
+
+    #[msg("Math overflow")]
+    MathOverflow,
 }

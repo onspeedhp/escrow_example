@@ -1,82 +1,106 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
-use crate::Escrow;
+use crate::{Escrow, EscrowError, EscrowStatus};
 
-pub fn init_escrow(ctx: Context<InitEscrow>, escrow_args: Escrow) -> Result<()> {
-    let initializer = &ctx.accounts.initializer;
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct InitEscrowArgs {
+    pub escrow_id: u64,
+    pub amount: u64,
+    pub quantity: u64,
+    pub delivery_deadline: i64,
+}
+
+pub fn init_escrow(ctx: Context<InitEscrow>, args: InitEscrowArgs) -> Result<()> {
+    require!(args.amount > 0, EscrowError::InvalidAmount);
+    require!(args.quantity > 0, EscrowError::InvalidQuantity);
+    require!(
+        args.delivery_deadline > Clock::get()?.unix_timestamp,
+        EscrowError::InvalidDeadline
+    );
+
+    let buyer = &ctx.accounts.buyer;
     let escrow_account = &mut ctx.accounts.escrow_account;
-    let vault_token_account = &ctx.accounts.vault_token_account;
-    let initializer_deposit_token_account = &ctx
-        .accounts
-        .initializer_deposit_token_account
-        .to_account_info();
 
-    let token_program = &ctx.accounts.token_program.to_account_info();
-
-    // assign data for escrow
-    escrow_account.initializer = initializer.key();
-    escrow_account.receiver = escrow_args.receiver;
+    escrow_account.escrow_id = args.escrow_id;
+    escrow_account.buyer = buyer.key();
+    escrow_account.seller = ctx.accounts.seller.key();
     escrow_account.mint = ctx.accounts.mint.key();
-    escrow_account.amount = escrow_args.amount;
-    escrow_account.start_time = escrow_args.start_time;
+    escrow_account.vault = ctx.accounts.vault_token_account.key();
+    escrow_account.amount = args.amount;
+    escrow_account.quantity = args.quantity;
+    escrow_account.delivery_deadline = args.delivery_deadline;
+    escrow_account.released_amount = 0;
+    escrow_account.received_quantity = 0;
+    escrow_account.status = EscrowStatus::Funded;
+    escrow_account.escrow_bump = ctx.bumps.escrow_account;
+    escrow_account.vault_authority_bump = ctx.bumps.vault_authority;
+    escrow_account.vault_bump = ctx.bumps.vault_token_account;
 
-    // transfer token
-    let transfer_accounts = Transfer {
-        from: initializer_deposit_token_account.clone(),
-        to: vault_token_account.to_account_info().clone(),
-        authority: initializer.to_account_info().clone(),
+    let transfer_accounts = TransferChecked {
+        from: ctx.accounts.buyer_token_account.to_account_info(),
+        mint: ctx.accounts.mint.to_account_info(),
+        to: ctx.accounts.vault_token_account.to_account_info(),
+        authority: buyer.to_account_info(),
     };
 
-    let transfer_ctx = CpiContext::new(token_program.to_account_info().clone(), transfer_accounts);
+    let cpi_ctx = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        transfer_accounts,
+    );
 
-    transfer(transfer_ctx, escrow_account.amount)
+    token::transfer_checked(cpi_ctx, args.amount, ctx.accounts.mint.decimals)
 }
 
 #[derive(Accounts)]
+#[instruction(args: InitEscrowArgs)]
 pub struct InitEscrow<'info> {
     #[account(mut)]
-    // The account of the person initializing the escrow
-    pub initializer: Signer<'info>,
+    pub buyer: Signer<'info>,
 
     #[account(
-        mut, 
-        constraint = initializer_deposit_token_account.mint == mint.key(),
-        constraint = initializer_deposit_token_account.owner == initializer.key()
+        mut,
+        constraint = buyer_token_account.mint == mint.key(),
+        constraint = buyer_token_account.owner == buyer.key()
     )]
-    pub initializer_deposit_token_account: Account<'info, TokenAccount>,
+    pub buyer_token_account: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK:
-    pub mint: UncheckedAccount<'info>,
+    /// CHECK: seller does not need to sign when the buyer creates the escrow template.
+    pub seller: UncheckedAccount<'info>,
+
+    pub mint: Box<Account<'info, Mint>>,
 
     #[account(
-        seeds = [b"vault_authority"],
+        init,
+        payer = buyer,
+        space = 8 + Escrow::LEN,
+        seeds = [
+            Escrow::PREFIX_SEED,
+            buyer.key().as_ref(),
+            seller.key().as_ref(),
+            &args.escrow_id.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub escrow_account: Box<Account<'info, Escrow>>,
+
+    #[account(
+        seeds = [Escrow::VAULT_AUTHORITY_SEED, escrow_account.key().as_ref()],
         bump,
     )]
-    /// CHECK:
-    pub vault_authority: AccountInfo<'info>,
+    /// CHECK: PDA authority for the vault token account.
+    pub vault_authority: UncheckedAccount<'info>,
 
     #[account(
-        init_if_needed,
-        seeds = [b"token-seed".as_ref(), initializer.key.as_ref(), mint.key().as_ref()],
+        init,
+        seeds = [Escrow::VAULT_SEED, escrow_account.key().as_ref()],
         bump,
-        payer = initializer,
+        payer = buyer,
         token::mint = mint,
         token::authority = vault_authority,
     )]
     pub vault_token_account: Box<Account<'info, TokenAccount>>,
 
-    #[account(
-        init_if_needed,
-        payer = initializer,
-        space = 8 + Escrow::INIT_SPACE,
-        seeds = [Escrow::PREFIX_SEED, initializer.key.as_ref(), mint.key.as_ref()],
-        bump
-    )]
-    // The escrow account, it will hold all necessary info about the trade.
-    pub escrow_account: Box<Account<'info, Escrow>>,
-
     pub system_program: Program<'info, System>,
-
     pub token_program: Program<'info, Token>,
 }

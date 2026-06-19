@@ -9,22 +9,23 @@ pub use state::*;
 
 declare_id!("EEVctJWhQ3Ag9u5H8XLYTai5sWsHWsTNJ2YrcJAP8D2g");
 
-// 1 minute
-pub const DEADLINE: i64 = 60;
-
 #[program]
 pub mod escrow_example {
     use super::*;
 
-    pub fn init_escrow(ctx: Context<InitEscrow>, escrow_args: Escrow) -> Result<()> {
-        instructions::init_escrow(ctx, escrow_args)
+    pub fn init_escrow(ctx: Context<InitEscrow>, args: InitEscrowArgs) -> Result<()> {
+        instructions::init_escrow(ctx, args)
     }
 
-    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, receiver_index: u8) -> Result<()> {
-        instructions::withdraw_funds(ctx, receiver_index)
+    pub fn confirm_receipt(ctx: Context<ConfirmReceipt>) -> Result<()> {
+        instructions::confirm_receipt(ctx)
     }
 
-    pub fn claim(ctx: Context<Claim>) -> Result<()> {
-        instructions::claim(ctx)
+    pub fn resolve_partial(ctx: Context<ResolvePartial>, received_quantity: u64) -> Result<()> {
+        instructions::resolve_partial(ctx, received_quantity)
+    }
+
+    pub fn claim_timeout(ctx: Context<ClaimTimeout>) -> Result<()> {
+        instructions::claim_timeout(ctx)
     }
 }
