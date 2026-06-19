@@ -1,5 +1,5 @@
-import { AnchorProvider } from '@coral-xyz/anchor';
-import { Keypair, SystemProgram, Transaction } from '@solana/web3.js';
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 
 export const createAccount = async ({
   provider,

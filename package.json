@@ -1,6 +1,9 @@
 {
   "license": "ISC",
   "scripts": {
+    "build": "anchor build",
+    "test": "anchor test",
+    "deploy:localnet": "anchor deploy",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
