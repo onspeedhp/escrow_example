@@ -1,13 +1,13 @@
 # Escrow Starter
 
-Anchor escrow starter để clone về sửa tiếp cho flow buyer-seller.
+Anchor escrow starter that teams can clone and adapt for a buyer-seller flow.
 
-Repo này đã có sẵn form cơ bản:
+This repo includes a basic starter shape:
 
-- `init_escrow`: buyer lock token vào vault.
-- `confirm_receipt`: buyer xác nhận nhận hàng, seller nhận 100%.
-- `resolve_partial`: buyer nhập số lượng thực nhận, seller nhận một phần, buyer được refund phần còn lại.
-- `claim_timeout`: seller claim nếu quá deadline mà buyer không phản hồi.
+- `init_escrow`: buyer locks tokens into a vault.
+- `confirm_receipt`: buyer confirms receipt, seller receives 100%.
+- `resolve_partial`: buyer enters the received quantity, seller receives a partial payout, buyer receives the refund.
+- `claim_timeout`: seller claims after the deadline if buyer does not respond.
 
 ## Tech Stack
 
@@ -16,7 +16,7 @@ Repo này đã có sẵn form cơ bản:
 - TypeScript tests
 - SPL Token
 
-## Cài Đặt
+## Setup
 
 ```bash
 git clone https://github.com/onspeedhp/escrow_example.git
@@ -24,14 +24,14 @@ cd escrow_example
 yarn install
 ```
 
-Cần có:
+Requirements:
 
 - Rust
 - Solana CLI
 - Anchor CLI `0.30.1`
 - Node.js/Yarn
 
-Nếu đang dùng `avm`:
+If using `avm`:
 
 ```bash
 avm use 0.30.1
@@ -39,15 +39,15 @@ avm use 0.30.1
 
 ## Env
 
-Tạo file `.env` từ mẫu:
+Create `.env` from the example file:
 
 ```bash
 cp .env.example .env
 ```
 
-`PRIVATE_KEY` là base58 secret key của ví dev dùng trong test để mint token/fund account.
+`PRIVATE_KEY` is the base58 secret key for a dev wallet used by tests to mint tokens and fund accounts.
 
-## Chạy Nhanh
+## Quick Start
 
 Build program:
 
@@ -55,7 +55,7 @@ Build program:
 yarn build
 ```
 
-Chạy test local:
+Run local tests:
 
 ```bash
 yarn test
@@ -67,27 +67,27 @@ Format code:
 yarn lint:fix
 ```
 
-## File Nên Xem Trước
+## Files To Read First
 
-- `programs/escrow-example/src/state.rs`: state của escrow account.
-- `programs/escrow-example/src/instructions/init_escrow.rs`: tạo escrow và lock token vào vault.
-- `programs/escrow-example/src/instructions/confirm_receipt.rs`: giải ngân 100%.
-- `programs/escrow-example/src/instructions/resolve_partial.rs`: giải ngân một phần.
-- `programs/escrow-example/src/instructions/claim_timeout.rs`: claim sau timeout.
-- `tests/escrow-example.ts`: ví dụ gọi program bằng TypeScript.
+- `programs/escrow-example/src/state.rs`: escrow account state.
+- `programs/escrow-example/src/instructions/init_escrow.rs`: creates the escrow and locks tokens into the vault.
+- `programs/escrow-example/src/instructions/confirm_receipt.rs`: releases 100% to the seller.
+- `programs/escrow-example/src/instructions/resolve_partial.rs`: releases a partial payout and refund.
+- `programs/escrow-example/src/instructions/claim_timeout.rs`: lets the seller claim after timeout.
+- `tests/escrow-example.ts`: TypeScript example for calling the program.
 
-## Flow Hiện Có
+## Current Flow
 
 ```text
-buyer -> init_escrow -> token vào vault PDA
-buyer -> confirm_receipt -> seller nhận 100%
-buyer -> resolve_partial(qty) -> seller nhận theo qty, buyer nhận refund
-seller -> claim_timeout -> seller nhận 100% sau deadline
+buyer -> init_escrow -> tokens go into the PDA vault
+buyer -> confirm_receipt -> seller receives 100%
+buyer -> resolve_partial(qty) -> seller receives by qty, buyer receives refund
+seller -> claim_timeout -> seller receives 100% after deadline
 ```
 
-## Ghi Chú
+## Notes
 
-- Với hackathon, nên chạy trên localnet/devnet trước.
-- Nếu chưa kịp dùng USDC thật, có thể dùng test SPL token giống test hiện tại.
-- Đây là starter, chưa phải production escrow.
-- Nếu cần chặt hơn, thêm bước seller cùng ký `resolve_partial`.
+- For hackathons, start on localnet/devnet first.
+- If real USDC is too much setup, use a test SPL token like the current test does.
+- This is a starter, not a production escrow.
+- For stricter settlement, require the seller to co-sign `resolve_partial`.
